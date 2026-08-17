@@ -1,1 +1,3 @@
-Voice samples in this folder are extracted from the four user-supplied reference videos and mapped to the four site characters by visual similarity. They are short site playback samples, not synthetic VOICEVOX lines.
+Video-derived voice samples for the four SKY GARDEN QUARTET characters.
+Files voice-01.b64 through voice-04.b64 are Base64-encoded browser-playable audio extracted from the user-provided videos.
+HD character source files and reconstruction chunks are staged on this branch for the final 8K pixel-dimension build.
