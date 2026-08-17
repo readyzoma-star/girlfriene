@@ -49,12 +49,10 @@ jobs:
                   self.refs = []
                   self.ids = []
                   self.img_alts = []
-                  self.has_title = False
                   self.has_viewport = False
                   self.has_charset = False
               def handle_starttag(self, tag, attrs):
                   d = dict(attrs)
-                  if tag == 'title': self.has_title = True
                   if tag == 'meta':
                       if d.get('name','').lower() == 'viewport': self.has_viewport = True
                       if d.get('charset'): self.has_charset = True
@@ -65,7 +63,8 @@ jobs:
 
           def local_target(page, ref):
               ref = ref.strip()
-              if not ref or ref.startswith(('#','mailto:','tel:','javascript:','data:')): return None
+              if not ref or '${' in ref or '{{' in ref: return None
+              if ref.startswith(('#','mailto:','tel:','javascript:','data:')): return None
               u = urlsplit(ref)
               if u.scheme or u.netloc: return None
               path = unquote(u.path)
