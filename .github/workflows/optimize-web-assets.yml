@@ -1,9 +1,10 @@
-name: Build lightweight web assets
+name: Build lightweight web assets and voices
 
 on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - perf/zundamon-lightweight
     paths:
       - 'assets/sky-garden/*.webp'
@@ -59,12 +60,65 @@ jobs:
                   assert display_path.stat().st_size < 350_000
                   assert thumb_path.stat().st_size < 100_000
           PY
-      - name: Commit responsive assets
+      - name: Generate static Zundamon profile voices
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, time, urllib.parse, urllib.request, urllib.error
+
+          texts = [
+              '青空と海が似合う、四人のムードメーカー。人懐っこい笑顔と行動力で、迷っている相手まで自然に波打ち際へ連れ出してしまう。虹を見つけた日は必ず誰かと写真を撮るのが密かなルール。',
+              '白銀の髪、黒い角と小さな翼を持つ、いたずら好きの海辺の魔族。強気に見えて距離は近く、気に入った相手にはすぐちょっかいを出す。涼しげな水辺ではいつもより無防備に笑う。',
+              '紫のラウンジを定位置にする、気だるげでマイペースな夜型の女性。言葉数は少ないが観察眼は鋭く、相手の変化には誰より早く気づく。無造作なデニムとチェーンを自分流に着こなすクールな存在。',
+              '猫耳と長い黒髪、片目のウインクが印象的な夜景好き。上品な雰囲気の中に小悪魔っぽい遊び心を隠していて、相手をからかうのが好き。都会の灯りを眺めながら過ごす時間を何より楽しむ。',
+          ]
+          out = pathlib.Path('assets/voice')
+          out.mkdir(parents=True, exist_ok=True)
+          headers = {'User-Agent': 'SKY-GARDEN-QUARTET/1.0'}
+
+          def get_json(url):
+              while True:
+                  try:
+                      req = urllib.request.Request(url, headers=headers)
+                      with urllib.request.urlopen(req, timeout=60) as r:
+                          return json.load(r)
+                  except urllib.error.HTTPError as e:
+                      if e.code != 429:
+                          raise
+                      wait = int(e.headers.get('Retry-After', '5'))
+                      print(f'Rate limited; waiting {wait}s')
+                      time.sleep(wait)
+
+          for i, text in enumerate(texts, 1):
+              query = urllib.parse.urlencode({'speaker': 3, 'text': text})
+              data = get_json('https://api.tts.quest/v3/voicevox/synthesis?' + query)
+              if not data.get('success', True):
+                  raise RuntimeError(f'Synthesis request failed for voice {i}: {data}')
+              status_url = data['audioStatusUrl']
+              for _ in range(90):
+                  status = get_json(status_url)
+                  if status.get('isAudioError'):
+                      raise RuntimeError(f'Audio synthesis failed for voice {i}: {status}')
+                  if status.get('isAudioReady'):
+                      break
+                  time.sleep(2)
+              else:
+                  raise TimeoutError(f'Voice {i} synthesis timed out')
+
+              audio_req = urllib.request.Request(data['mp3DownloadUrl'], headers=headers)
+              with urllib.request.urlopen(audio_req, timeout=120) as r:
+                  audio = r.read()
+              if len(audio) < 5000:
+                  raise RuntimeError(f'Voice {i} is unexpectedly small: {len(audio)} bytes')
+              target = out / f'intro-{i:02d}.mp3'
+              target.write_bytes(audio)
+              print(f'{target}: {len(audio)} bytes / {data.get("speakerName", "speaker 3")}')
+          PY
+      - name: Commit responsive assets and voices
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add assets/sky-garden/web assets/sky-garden/thumb
+          git add assets/sky-garden/web assets/sky-garden/thumb assets/voice/intro-*.mp3
           git diff --cached --quiet && exit 0
-          git commit -m 'Build lightweight responsive character assets'
+          git commit -m 'Build lightweight assets and Zundamon intro voices'
           git pull --rebase origin "$GITHUB_REF_NAME"
           git push origin "HEAD:$GITHUB_REF_NAME"
