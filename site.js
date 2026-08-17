@@ -1,0 +1,11 @@
+const SQ_VISITORS=[
+ {name:'蒼穹の案内人',eng:'AZURE ATTENDANT',role:'THE GUIDE OF THE FLOATING GARDEN',img:'assets/sky-garden/01-attendant.webp',accent:'#31d8ff',quotes:['空の庭園へようこそ。今日は少しだけ、そばにいてください。','雲の向こうまで行ってみます？　ちゃんと案内しますから。','急がなくても大丈夫。ここでは風まで、のんびりしています。']},
+ {name:'紫苑の兎姫',eng:'VIOLET HARE',role:'THE RESTLESS DANCER OF VIOLET WIND',img:'assets/sky-garden/02-hare.webp',accent:'#8d67ff',quotes:['そんなに見つめたら、踊りたくなっちゃうじゃない。','退屈は禁止。ほら、もっと派手に遊びましょ。','ふふっ、ついて来られるなら来てみて。']},
+ {name:'白銀の角姫',eng:'SILVER HORN',role:'THE SILENT PRINCESS ABOVE THE CLOUDS',img:'assets/sky-garden/03-horn.webp',accent:'#dfe8ff',quotes:['静かにして。風の音まで、ちゃんと聞きたいの。','ここ、悪くないわね。もう少しだけ居てもいい。','見失わないで。私は先に行くから。']},
+ {name:'朱夏の舞姫',eng:'SCARLET DANCER',role:'THE BOLD STAR OF THE SUMMER SKY',img:'assets/sky-garden/04-dancer.webp',accent:'#ff4f9f',quotes:['ほら、迷ってないで。こっちに来なさいな。','空の上だって、楽しんだ者勝ちでしょ？','ちゃんと見てて。次はもっと大胆にいくから。']}
+];
+function burstPetals(n=16){for(let i=0;i<n;i++){const p=document.createElement('i');p.className='petal';p.style.left=(48+Math.random()*8)+'vw';p.style.top=(42+Math.random()*14)+'vh';p.style.setProperty('--dx',((Math.random()-.5)*95)+'vw');p.style.setProperty('--dy',((Math.random()-.2)*75)+'vh');p.style.animationDelay=(Math.random()*.12)+'s';document.body.appendChild(p);setTimeout(()=>p.remove(),1500)}}
+function initGallery(){const modal=document.querySelector('.modal'),modalImg=modal?.querySelector('img');document.querySelectorAll('[data-modal-img]').forEach(el=>el.addEventListener('click',()=>{if(!modal)return;modalImg.src=el.dataset.modalImg;modal.classList.add('open')}));modal?.addEventListener('click',e=>{if(e.target===modal||e.target.tagName==='BUTTON')modal.classList.remove('open')});document.addEventListener('keydown',e=>{if(e.key==='Escape')modal?.classList.remove('open')})}
+function activateNav(){const file=location.pathname.split('/').pop()||'index.html';document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active',a.getAttribute('href')===file))}
+function voiceLine(text){const u=new URL('https://api.tts.quest/v3/voicevox/synthesis');u.searchParams.set('speaker','3');u.searchParams.set('text',text);fetch(u).then(r=>r.json()).then(d=>{const src=d.mp3StreamingUrl||d.mp3DownloadUrl;if(src)new Audio(src).play()}).catch(()=>{})}
+document.addEventListener('DOMContentLoaded',()=>{activateNav();initGallery()});
