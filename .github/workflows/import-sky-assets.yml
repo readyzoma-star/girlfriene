@@ -1,5 +1,6 @@
 name: Import sky garden assets
 
+# One-time importer for the self-contained gallery.
 on:
   push:
     paths:
