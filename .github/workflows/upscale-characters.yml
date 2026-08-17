@@ -7,7 +7,7 @@ on:
       - feature/final-hd-voices
     paths:
       - 'assets/source-hd/**'
-      - 'assets/avif-chunks/02-*.txt'
+      - 'assets/avif-chunks/02f-*.txt'
       - '.github/workflows/upscale-characters.yml'
 
 permissions:
@@ -26,7 +26,7 @@ jobs:
       - name: Reconstruct Lucia source
         run: |
           mkdir -p assets/source-hd
-          cat assets/avif-chunks/02-*.txt | tr -d '\n\r ' | base64 -d > assets/source-hd/02.avif
+          cat assets/avif-chunks/02f-*.txt | tr -d '\n\r ' | base64 -d > assets/source-hd/02.avif
           test -s assets/source-hd/02.avif
       - name: Build 8K WebP assets
         run: |
