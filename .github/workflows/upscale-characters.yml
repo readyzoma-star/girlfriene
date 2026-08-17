@@ -7,7 +7,6 @@ on:
       - feature/final-hd-voices
     paths:
       - 'assets/source-hd/**'
-      - 'assets/avif-chunks/02f-*.txt'
       - '.github/workflows/upscale-characters.yml'
 
 permissions:
@@ -23,42 +22,38 @@ jobs:
           fetch-depth: 0
       - name: Install Pillow
         run: python3 -m pip install --quiet pillow
-      - name: Reconstruct Lucia source
+      - name: Validate HD sources
         run: |
-          mkdir -p assets/source-hd
-          cat assets/avif-chunks/02f-*.txt | tr -d '\n\r ' | base64 -d > assets/source-hd/02.avif
-          test -s assets/source-hd/02.avif
+          python3 - <<'PY'
+          from PIL import Image
+          for n in ('01','02','03','04'):
+              p=f'assets/source-hd/{n}.avif'
+              with Image.open(p) as im:
+                  print(p, im.size)
+                  assert max(im.size) >= 1500
+          PY
       - name: Build 8K WebP assets
         run: |
           python3 - <<'PY'
           from pathlib import Path
           from PIL import Image, ImageFilter
-          pairs = [
-              ('01.avif','01-attendant.webp'),
-              ('02.avif','02-hare.webp'),
-              ('03.avif','03-horn.webp'),
-              ('04.avif','04-dancer.webp'),
-          ]
-          outdir = Path('assets/sky-garden')
-          outdir.mkdir(parents=True, exist_ok=True)
-          for src_name, out_name in pairs:
-              src = Path('assets/source-hd') / src_name
-              with Image.open(src) as im:
-                  im = im.convert('RGB')
-                  w, h = im.size
-                  scale = 7680 / max(w, h)
-                  target = (round(w*scale), round(h*scale))
-                  im = im.resize(target, Image.Resampling.LANCZOS)
-                  im = im.filter(ImageFilter.UnsharpMask(radius=1.0, percent=105, threshold=3))
-                  out = outdir / out_name
-                  im.save(out, 'WEBP', quality=82, method=6)
-                  print(out, target, out.stat().st_size)
+          pairs=[('01.avif','01-attendant.webp'),('02.avif','02-hare.webp'),('03.avif','03-horn.webp'),('04.avif','04-dancer.webp')]
+          outdir=Path('assets/sky-garden'); outdir.mkdir(parents=True,exist_ok=True)
+          for src_name,out_name in pairs:
+              with Image.open(Path('assets/source-hd')/src_name) as im:
+                  im=im.convert('RGB')
+                  w,h=im.size; scale=7680/max(w,h); target=(round(w*scale),round(h*scale))
+                  im=im.resize(target,Image.Resampling.LANCZOS)
+                  im=im.filter(ImageFilter.UnsharpMask(radius=1.0,percent=105,threshold=3))
+                  out=outdir/out_name
+                  im.save(out,'WEBP',quality=82,method=6)
+                  print(out,target,out.stat().st_size)
           PY
       - name: Commit generated assets
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add assets/sky-garden/*.webp assets/source-hd/02.avif
+          git add assets/sky-garden/*.webp
           git diff --cached --quiet && exit 0
           git commit -m 'Build quartet visuals at 8K pixel dimensions'
           git pull --rebase origin "$GITHUB_REF_NAME"
