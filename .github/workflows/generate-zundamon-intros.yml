@@ -1,0 +1,67 @@
+name: Generate Zundamon intro voices
+
+on:
+  push:
+    branches:
+      - ux/gallery-static-zundamon
+    paths:
+      - .github/workflows/generate-zundamon-intros.yml
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate four VOICEVOX Zundamon MP3 files
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, urllib.parse, urllib.request
+
+          texts = [
+              '青空と海が似合う、四人のムードメーカー。人懐っこい笑顔と行動力で、迷っている相手まで自然に波打ち際へ連れ出してしまう。虹を見つけた日は必ず誰かと写真を撮るのが密かなルール。',
+              '白銀の髪、黒い角と小さな翼を持つ、いたずら好きの海辺の魔族。強気に見えて距離は近く、気に入った相手にはすぐちょっかいを出す。涼しげな水辺ではいつもより無防備に笑う。',
+              '紫のラウンジを定位置にする、気だるげでマイペースな夜型の女性。言葉数は少ないが観察眼は鋭く、相手の変化には誰より早く気づく。無造作なデニムとチェーンを自分流に着こなすクールな存在。',
+              '猫耳と長い黒髪、片目のウインクが印象的な夜景好き。上品な雰囲気の中に小悪魔っぽい遊び心を隠していて、相手をからかうのが好き。都会の灯りを眺めながら過ごす時間を何より楽しむ。',
+          ]
+
+          out = pathlib.Path('assets/voice')
+          out.mkdir(parents=True, exist_ok=True)
+          headers = {'User-Agent': 'SKY-GARDEN-QUARTET/1.0'}
+
+          for i, text in enumerate(texts, 1):
+              query = urllib.parse.urlencode({'speaker': 3, 'text': text})
+              req = urllib.request.Request('https://api.tts.quest/v3/voicevox/synthesis?' + query, headers=headers)
+              with urllib.request.urlopen(req, timeout=60) as r:
+                  data = json.load(r)
+              audio_url = data.get('mp3DownloadUrl') or data.get('mp3StreamingUrl')
+              if not audio_url:
+                  raise RuntimeError(f'No MP3 URL for voice {i}: {data}')
+              audio_req = urllib.request.Request(audio_url, headers=headers)
+              with urllib.request.urlopen(audio_req, timeout=120) as r:
+                  audio = r.read()
+              if len(audio) < 5000:
+                  raise RuntimeError(f'Voice {i} is unexpectedly small: {len(audio)} bytes')
+              target = out / f'intro-{i:02d}.mp3'
+              target.write_bytes(audio)
+              print(f'{target}: {len(audio)} bytes')
+          PY
+
+      - name: Commit generated voices
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/voice/intro-*.mp3
+          if git diff --cached --quiet; then
+            echo "No voice changes"
+            exit 0
+          fi
+          git commit -m "Generate Zundamon profile intro voices"
+          git pull --rebase origin ux/gallery-static-zundamon
+          git push origin HEAD:ux/gallery-static-zundamon
