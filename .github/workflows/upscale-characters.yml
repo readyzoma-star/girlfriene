@@ -7,6 +7,7 @@ on:
       - feature/final-hd-voices
     paths:
       - 'assets/source-hd/**'
+      - 'assets/q10chunks/**'
       - '.github/workflows/upscale-characters.yml'
 
 permissions:
@@ -22,12 +23,19 @@ jobs:
           fetch-depth: 0
       - name: Install Pillow
         run: python3 -m pip install --quiet pillow
+      - name: Reconstruct verified HD sources
+        run: |
+          mkdir -p assets/source-hd
+          cat assets/q10chunks/03-*.txt | tr -d '\n\r ' | base64 -d > assets/source-hd/03.avif
+          cat assets/q10chunks/04-*.txt | tr -d '\n\r ' | base64 -d > assets/source-hd/04.avif
       - name: Validate HD sources
         run: |
           python3 - <<'PY'
           from PIL import Image
           for n in ('01','02','03','04'):
               p=f'assets/source-hd/{n}.avif'
+              with Image.open(p) as im:
+                  im.verify()
               with Image.open(p) as im:
                   print(p, im.size)
                   assert max(im.size) >= 1500
@@ -42,7 +50,9 @@ jobs:
           for src_name,out_name in pairs:
               with Image.open(Path('assets/source-hd')/src_name) as im:
                   im=im.convert('RGB')
-                  w,h=im.size; scale=7680/max(w,h); target=(round(w*scale),round(h*scale))
+                  w,h=im.size
+                  scale=7680/max(w,h)
+                  target=(round(w*scale),round(h*scale))
                   im=im.resize(target,Image.Resampling.LANCZOS)
                   im=im.filter(ImageFilter.UnsharpMask(radius=1.0,percent=105,threshold=3))
                   out=outdir/out_name
@@ -53,7 +63,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add assets/sky-garden/*.webp
+          git add assets/sky-garden/*.webp assets/source-hd/03.avif assets/source-hd/04.avif
           git diff --cached --quiet && exit 0
           git commit -m 'Build quartet visuals at 8K pixel dimensions'
           git pull --rebase origin "$GITHUB_REF_NAME"
