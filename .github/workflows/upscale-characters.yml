@@ -1,52 +1,65 @@
-name: Upscale character visuals to 8K
+name: Build 8K character assets
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - feature/final-hd-voices
     paths:
+      - 'assets/source-hd/**'
+      - 'assets/avif-chunks/02-*.txt'
       - '.github/workflows/upscale-characters.yml'
 
 permissions:
   contents: write
 
 jobs:
-  upscale:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
+        with:
+          fetch-depth: 0
       - name: Install Pillow
         run: python3 -m pip install --quiet pillow
-
-      - name: Upscale four character visuals
+      - name: Reconstruct Lucia source
+        run: |
+          mkdir -p assets/source-hd
+          cat assets/avif-chunks/02-*.txt | tr -d '\n\r ' | base64 -d > assets/source-hd/02.avif
+          test -s assets/source-hd/02.avif
+      - name: Build 8K WebP assets
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          from PIL import Image, ImageEnhance, ImageFilter
-
-          paths = [
-              Path('assets/sky-garden/01-attendant.webp'),
-              Path('assets/sky-garden/02-hare.webp'),
-              Path('assets/sky-garden/03-horn.webp'),
-              Path('assets/sky-garden/04-dancer.webp'),
+          from PIL import Image, ImageFilter
+          pairs = [
+              ('01.avif','01-attendant.webp'),
+              ('02.avif','02-hare.webp'),
+              ('03.avif','03-horn.webp'),
+              ('04.avif','04-dancer.webp'),
           ]
-          target = (5120, 7680)
-          for path in paths:
-              with Image.open(path) as src:
-                  im = src.convert('RGB')
+          outdir = Path('assets/sky-garden')
+          outdir.mkdir(parents=True, exist_ok=True)
+          for src_name, out_name in pairs:
+              src = Path('assets/source-hd') / src_name
+              with Image.open(src) as im:
+                  im = im.convert('RGB')
+                  w, h = im.size
+                  scale = 7680 / max(w, h)
+                  target = (round(w*scale), round(h*scale))
                   im = im.resize(target, Image.Resampling.LANCZOS)
-                  im = im.filter(ImageFilter.UnsharpMask(radius=1.1, percent=115, threshold=3))
-                  im = ImageEnhance.Contrast(im).enhance(1.02)
-                  im.save(path, 'WEBP', quality=88, method=6)
-                  print(path, im.size, path.stat().st_size)
+                  im = im.filter(ImageFilter.UnsharpMask(radius=1.0, percent=105, threshold=3))
+                  out = outdir / out_name
+                  im.save(out, 'WEBP', quality=82, method=6)
+                  print(out, target, out.stat().st_size)
           PY
-
-      - name: Commit 8K upscaled assets
+      - name: Commit generated assets
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add assets/sky-garden/*.webp
+          git add assets/sky-garden/*.webp assets/source-hd/02.avif
           git diff --cached --quiet && exit 0
-          git commit -m 'Upscale quartet character visuals to 8K'
-          git push
+          git commit -m 'Build quartet visuals at 8K pixel dimensions'
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
