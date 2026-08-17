@@ -1,0 +1,52 @@
+name: Upscale character visuals to 8K
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/upscale-characters.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  upscale:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Pillow
+        run: python3 -m pip install --quiet pillow
+
+      - name: Upscale four character visuals
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageEnhance, ImageFilter
+
+          paths = [
+              Path('assets/sky-garden/01-attendant.webp'),
+              Path('assets/sky-garden/02-hare.webp'),
+              Path('assets/sky-garden/03-horn.webp'),
+              Path('assets/sky-garden/04-dancer.webp'),
+          ]
+          target = (5120, 7680)
+          for path in paths:
+              with Image.open(path) as src:
+                  im = src.convert('RGB')
+                  im = im.resize(target, Image.Resampling.LANCZOS)
+                  im = im.filter(ImageFilter.UnsharpMask(radius=1.1, percent=115, threshold=3))
+                  im = ImageEnhance.Contrast(im).enhance(1.02)
+                  im.save(path, 'WEBP', quality=88, method=6)
+                  print(path, im.size, path.stat().st_size)
+          PY
+
+      - name: Commit 8K upscaled assets
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/sky-garden/*.webp
+          git diff --cached --quiet && exit 0
+          git commit -m 'Upscale quartet character visuals to 8K'
+          git push
