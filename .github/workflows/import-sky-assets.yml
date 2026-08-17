@@ -1,0 +1,47 @@
+name: Import sky garden assets
+
+on:
+  push:
+    paths:
+      - '.github/workflows/import-sky-assets.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download gallery images
+        run: |
+          mkdir -p assets/sky-garden
+          curl -fL --retry 3 -o assets/sky-garden/01-attendant.webp https://raw.githubusercontent.com/readyzoma-star/katsudon-channel-test/feature/anime-sky-garden/assets/sky-garden/01-attendant.webp
+          curl -fL --retry 3 -o assets/sky-garden/02-hare.webp https://raw.githubusercontent.com/readyzoma-star/katsudon-channel-test/feature/anime-sky-garden/assets/sky-garden/02-hare.webp
+          curl -fL --retry 3 -o assets/sky-garden/03-horn.webp https://raw.githubusercontent.com/readyzoma-star/katsudon-channel-test/feature/anime-sky-garden/assets/sky-garden/03-horn.webp
+          curl -fL --retry 3 -o assets/sky-garden/04-dancer.webp https://raw.githubusercontent.com/readyzoma-star/katsudon-channel-test/feature/anime-sky-garden/assets/sky-garden/04-dancer.webp
+
+      - name: Switch homepage to local assets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text()
+          s = s.replace("const ROOT='https://raw.githubusercontent.com/readyzoma-star/katsudon-channel-test/feature/anime-sky-garden/assets/sky-garden/';", "const ROOT='assets/sky-garden/';")
+          p.write_text(s)
+          PY
+
+      - name: Commit imported assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html assets/sky-garden
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Import sky garden images locally [skip ci]"
+            git push
+          fi
