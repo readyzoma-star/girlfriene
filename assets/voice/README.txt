@@ -1,0 +1,1 @@
+Voice samples in this folder are extracted from the four user-supplied reference videos and mapped to the four site characters by visual similarity. They are short site playback samples, not synthetic VOICEVOX lines.
