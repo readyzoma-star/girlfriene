@@ -1,0 +1,70 @@
+name: Build lightweight web assets
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - perf/zundamon-lightweight
+    paths:
+      - 'assets/sky-garden/*.webp'
+      - '.github/workflows/optimize-web-assets.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install Pillow
+        run: python3 -m pip install --quiet pillow
+      - name: Build responsive WebP assets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          sources = [
+              ('01-attendant.webp', '01'),
+              ('02-hare.webp', '02'),
+              ('03-horn.webp', '03'),
+              ('04-dancer.webp', '04'),
+          ]
+          root = Path('assets/sky-garden')
+          web = root / 'web'
+          thumb = root / 'thumb'
+          web.mkdir(parents=True, exist_ok=True)
+          thumb.mkdir(parents=True, exist_ok=True)
+
+          def resize_max(im, max_edge):
+              w, h = im.size
+              scale = min(1.0, max_edge / max(w, h))
+              return im.resize((round(w * scale), round(h * scale)), Image.Resampling.LANCZOS)
+
+          for filename, stem in sources:
+              with Image.open(root / filename) as src:
+                  src = src.convert('RGB')
+                  display = resize_max(src, 1600)
+                  preview = resize_max(src, 480)
+                  display_path = web / f'{stem}.webp'
+                  thumb_path = thumb / f'{stem}.webp'
+                  display.save(display_path, 'WEBP', quality=74, method=6)
+                  preview.save(thumb_path, 'WEBP', quality=66, method=6)
+                  print(display_path, display.size, display_path.stat().st_size)
+                  print(thumb_path, preview.size, thumb_path.stat().st_size)
+                  assert display_path.stat().st_size < 350_000
+                  assert thumb_path.stat().st_size < 100_000
+          PY
+      - name: Commit responsive assets
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/sky-garden/web assets/sky-garden/thumb
+          git diff --cached --quiet && exit 0
+          git commit -m 'Build lightweight responsive character assets'
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
